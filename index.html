@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketplace</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: system-ui, sans-serif; }
+  .btn-green { background: #16a34a; color: white; }
+  .btn-green:hover { background: #15803d; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<header class="bg-white border-b sticky top-0 z-20">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
+    <a href="#" onclick="showPage('home')" class="font-bold text-lg flex items-center gap-2">
+      <span class="w-6 h-6 rounded bg-green-600 flex items-center justify-center text-white text-xs">M</span>
+      Marketplace
+    </a>
+    <input id="search" placeholder="Search for anything..."
+           class="flex-1 max-w-2xl border rounded-full px-4 py-2 text-sm"
+           oninput="render()">
+    <nav class="flex items-center gap-4 text-sm">
+      <a href="#" onclick="showPage('home')" class="hover:text-green-600">Home</a>
+      <a href="#" onclick="showPage('sell')" class="btn-green px-4 py-2 rounded-full font-semibold">+ Sell now</a>
+      <a href="#" onclick="showPage('dashboard')" class="hover:text-green-600">Admin</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto p-4">
+
+  <!-- HOME PAGE -->
+  <div id="page-home">
+    <section class="bg-gradient-to-b from-green-50 to-transparent -mx-4 px-4 pt-10 pb-12 text-center">
+      <h1 class="text-4xl md:text-5xl font-bold">Buy &amp; Sell <span class="text-green-600">Anything</span></h1>
+      <p class="text-gray-600 mt-3 max-w-lg mx-auto">Turn unused stuff into cash in minutes.</p>
+      <div class="mt-6 flex justify-center gap-3">
+        <a href="#" onclick="showPage('sell')" class="btn-green px-6 py-3 rounded-full font-semibold">Start Selling</a>
+        <a href="#listings" class="border border-gray-300 px-6 py-3 rounded-full font-semibold hover:bg-gray-50">Browse Deals</a>
+      </div>
+    </section>
+
+    <section class="py-8">
+      <h2 class="text-lg font-bold mb-4">Shop by Category</h2>
+      <div id="categories" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-8 gap-3"></div>
+    </section>
+
+    <section id="listings" class="py-8">
+      <h2 class="text-lg font-bold mb-4">Latest Listings</h2>
+      <div id="listing-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+    </section>
+  </div>
+
+  <!-- SELL PAGE -->
+  <div id="page-sell" class="hidden max-w-lg mx-auto">
+    <form onsubmit="createListing(event)" class="bg-white rounded-lg p-6 space-y-4 shadow-sm">
+      <h1 class="text-2xl font-bold">Sell an item</h1>
+      <div>
+        <label class="block text-sm font-medium mb-1">Photo URL</label>
+        <input id="new-image" placeholder="https://..." class="w-full border rounded px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Title</label>
+        <input id="new-title" required class="w-full border rounded px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Price ($)</label>
+        <input id="new-price" type="number" step="0.01" required class="w-full border rounded px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Category</label>
+        <select id="new-category" class="w-full border rounded px-3 py-2">
+          <option>Electronics</option><option>Home &amp; Garden</option>
+          <option>Women</option><option>Men</option><option>Sports</option>
+          <option>Toys &amp; Games</option><option>Vintage</option><option>Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Description</label>
+        <textarea id="new-description" rows="4" required class="w-full border rounded px-3 py-2"></textarea>
+      </div>
+      <button class="w-full btn-green rounded py-3 font-semibold">Publish listing</button>
+    </form>
+  </div>
+
+  <!-- DASHBOARD PAGE -->
+  <div id="page-dashboard" class="hidden">
+    <h1 class="text-2xl font-bold mb-6">Admin Dashboard</h1>
+    <div id="stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-xs text-gray-500">
+          <tr>
+            <th class="px-4 py-2">Photo</th>
+            <th class="px-4 py-2">Title</th>
+            <th class="px-4 py-2">Price</th>
+            <th class="px-4 py-2">Category</th>
+            <th class="px-4 py-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="admin-rows" class="divide-y"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- LISTING DETAIL -->
+  <div id="page-detail" class="hidden"></div>
+
+</main>
+
+<script>
+const STORAGE_KEY = 'marketplace_listings';
+const CATEGORIES = ['Women','Men','Electronics','Home & Garden','Beauty','Sports','Toys & Games','Vintage'];
+let currentFilter = null;
+
+function getListings() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+}
+function saveListings(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+function seedIfEmpty() {
+  if (getListings().length === 0) {
+    saveListings([
+      { id: 1, title: 'Gaming Laptop', price: 950, category: 'Electronics',
+        description: 'RTX 4060, 16GB RAM, perfect for gaming.',
+        image: 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=400' },
+      { id: 2, title: 'LG Washer and Dryer Set', price: 300, category: 'Home & Garden',
+        description: 'Barely used, works perfectly.',
+        image: 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=400' },
+      { id: 3, title: 'iPhone 15 Pro', price: 800, category: 'Electronics',
+        description: 'Like new, 256GB, unlocked.',
+        image: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=400' },
+      { id: 4, title: 'Nike Air Max', price: 85, category: 'Men',
+        description: 'Size 10, worn twice.',
+        image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400' },
+      { id: 5, title: 'Vintage Leather Jacket', price: 120, category: 'Vintage',
+        description: 'Real leather, 1980s style.',
+        image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400' },
+    ]);
+  }
+}
+
+function showPage(page) {
+  ['home','sell','dashboard','detail'].forEach(p => {
+    document.getElementById('page-' + p).classList.toggle('hidden', p !== page);
+  });
+  if (page === 'dashboard') renderDashboard();
+  window.scrollTo(0, 0);
+}
+
+function renderCategories() {
+  const el = document.getElementById('categories');
+  el.innerHTML = CATEGORIES.map(c => `
+    <button onclick="filterCategory('${c}')"
+       class="bg-white border rounded-lg p-3 flex flex-col items-center gap-1 hover:border-green-500 transition text-center">
+      <span class="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">${c[0]}</span>
+      <span class="text-xs font-medium leading-tight">${c}</span>
+    </button>
+  `).join('');
+}
+
+function filterCategory(c) {
+  currentFilter = currentFilter === c ? null : c;
+  render();
+}
+
+function render() {
+  const q = document.getElementById('search').value.toLowerCase();
+  let listings = getListings();
+  if (q) listings = listings.filter(l =>
+    l.title.toLowerCase().includes(q) || l.description.toLowerCase().includes(q));
+  if (currentFilter) listings = listings.filter(l => l.category === currentFilter);
+
+  const grid = document.getElementById('listing-grid');
+  if (listings.length === 0) {
+    grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-16">No listings yet. Click "Sell now" to add one.</p>';
+    return;
+  }
+  grid.innerHTML = listings.map(l => `
+    <div class="bg-white rounded-lg overflow-hidden hover:shadow-md transition cursor-pointer" onclick="showDetail(${l.id})">
+      <img src="${l.image || 'https://via.placeholder.com/400'}" class="w-full aspect-square object-cover">
+      <div class="p-3 space-y-1">
+        <p class="font-semibold text-sm text-green-600">$${Number(l.price).toFixed(2)}</p>
+        <p class="text-sm truncate">${l.title}</p>
+        <p class="text-[11px] text-gray-500">${l.category}</p>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showDetail(id) {
+  const l = getListings().find(x => x.id === id);
+  if (!l) return;
+  document.getElementById('page-detail').innerHTML = `
+    <button onclick="showPage('home')" class="text-sm underline mb-4">← Back</button>
+    <div class="grid lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2">
+        <img src="${l.image}" class="w-full rounded-lg border object-contain max-h-[500px]">
+      </div>
+      <aside class="bg-white rounded-lg p-5 border space-y-3">
+        <h1 class="text-2xl font-bold uppercase">${l.title}</h1>
+        <p class="text-3xl font-bold text-green-600">$${Number(l.price).toFixed(2)}</p>
+        <span class="bg-gray-100 text-gray-700 text-xs font-semibold px-3 py-1 rounded-full inline-block">Negotiable</span>
+        <div class="flex gap-5 text-sm text-gray-500">
+          <span>👁 40 views</span><span>♡ 3 likes</span><span>🕒 2d ago</span>
+        </div>
+        <div class="flex gap-2 pt-3">
+          <button class="flex-1 btn-green rounded-lg py-3 font-semibold">💬 Message Seller</button>
+          <button onclick="alert('Offer modal goes here')"
+                  class="flex-1 border-2 border-gray-200 rounded-lg py-3 font-semibold">$ Make Offer</button>
+        </div>
+        <div class="pt-4 border-t">
+          <h2 class="font-semibold mb-2">Description</h2>
+          <p class="text-sm text-gray-700">${l.description}</p>
+        </div>
+      </aside>
+    </div>
+  `;
+  showPage('detail');
+}
+
+function createListing(e) {
+  e.preventDefault();
+  const list = getListings();
+  list.unshift({
+    id: Date.now(),
+    title: document.getElementById('new-title').value,
+    price: parseFloat(document.getElementById('new-price').value),
+    category: document.getElementById('new-category').value,
+    description: document.getElementById('new-description').value,
+    image: document.getElementById('new-image').value || 'https://via.placeholder.com/400',
+  });
+  saveListings(list);
+  e.target.reset();
+  showPage('home');
+  render();
+}
+
+function renderDashboard() {
+  const list = getListings();
+  document.getElementById('stats').innerHTML = `
+    <div class="bg-white rounded-lg p-4 shadow-sm"><p class="text-xs text-gray-500">Listings</p><p class="text-3xl font-bold">${list.length}</p></div>
+    <div class="bg-white rounded-lg p-4 shadow-sm"><p class="text-xs text-gray-500">Total value</p><p class="text-3xl font-bold">$${list.reduce((s,l)=>s+Number(l.price),0).toFixed(0)}</p></div>
+    <div class="bg-white rounded-lg p-4 shadow-sm"><p class="text-xs text-gray-500">Categories</p><p class="text-3xl font-bold">${new Set(list.map(l=>l.category)).size}</p></div>
+    <div class="bg-white rounded-lg p-4 shadow-sm"><p class="text-xs text-gray-500">Active bans</p><p class="text-3xl font-bold text-red-600">0</p></div>
+  `;
+  document.getElementById('admin-rows').innerHTML = list.map(l => `
+    <tr>
+      <td class="px-4 py-2"><img src="${l.image}" class="w-10 h-10 rounded object-cover"></td>
+      <td class="px-4 py-3 font-medium">${l.title}</td>
+      <td class="px-4 py-3">$${Number(l.price).toFixed(2)}</td>
+      <td class="px-4 py-3 text-gray-600">${l.category}</td>
+      <td class="px-4 py-3">
+        <button onclick="deleteListing(${l.id})" class="text-red-600 hover:underline text-xs">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function deleteListing(id) {
+  if (!confirm('Delete this listing?')) return;
+  saveListings(getListings().filter(l => l.id !== id));
+  renderDashboard();
+  render();
+}
+
+seedIfEmpty();
+renderCategories();
+render();
+</script>
+</body>
+</html>
